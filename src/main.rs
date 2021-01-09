@@ -1,5 +1,3 @@
-#![feature(generators, generator_trait)]
-
 extern crate reqwest;
 extern crate json;
 
@@ -22,19 +20,16 @@ async fn get_market(id: String) -> Result<String, reqwest::Error> {
 }
 
 fn get_commodity_data(market: &json::JsonValue, commodity_name: String) -> Option<CommodityData> {
-    for commodity in market["commodities"].members() {
-        if commodity["name"].to_string() == commodity_name {
-            return Some(CommodityData {
+    match market["commodities"].members().filter(|x| x["name"].to_string() == commodity_name).next() {
+        Some(data) => Some(CommodityData {
                 system: market["name"].to_string(),
                 station: market["sName"].to_string(),
                 name: commodity_name,
-                supply: commodity["stock"].as_u32().unwrap(),
-                price: commodity["sellPrice"].as_u32().unwrap(),
-            })
-        }
+                supply: data["stock"].as_u32().unwrap(),
+                price: data["sellPrice"].as_u32().unwrap(),
+            }),
+        None => None
     }
-
-    None
 }
 
 #[tokio::main]
@@ -46,10 +41,10 @@ async fn main() -> Result<(), reqwest::Error> {
 
     let mut entries = Vec::<CommodityData>::new();
 
-    for page in 1..number_of_pages {
+    for page in 1..(number_of_pages + 1) {
         let body = get_page(page).await?;
-        let parsed = json::parse(&body).unwrap();
-        for station in parsed["docs"].members() {
+        let stations = json::parse(&body).unwrap();
+        for station in stations["docs"].members() {
             let market = get_market(station["ed_market_id"].to_string()).await?;
             let market_json = json::parse(&market).unwrap();
             if let Some(commodity_data) = get_commodity_data(&market_json, String::from("Silver")) {
@@ -61,8 +56,8 @@ async fn main() -> Result<(), reqwest::Error> {
 
     entries.sort_by(|a, b| b.supply.cmp(&a.supply));
 
-    for commodity in entries {
-        println!("{:20} Station {:30} {} Price {:10} Supply {:10}",
+    for commodity in entries.iter().filter(|e| e.supply > 500) {
+        println!("{:30} at {:30} {} price {:10} supply {:10}",
                 commodity.system,
                 commodity.station,
                 commodity.name,
