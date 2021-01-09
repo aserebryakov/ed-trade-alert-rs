@@ -16,8 +16,7 @@ async fn get_market(id: String) -> Result<String, reqwest::Error> {
 fn print_silver_data(market: json::JsonValue) {
     for commodity in market["commodities"].members() {
         if (commodity["name"].to_string() == "Silver") {
-            println!("system {} station {}", market["name"].to_string(), market["sName"].to_string());
-            println!("{} price {} stock {}", commodity["name"].to_string(), commodity["sellPrice"], commodity["demand"]);
+            println!("system {:20} station {:20} {} price {:20} stock {:20}", market["name"], market["sName"], commodity["name"], commodity["sellPrice"], commodity["stock"]);
         }
     }
 }
@@ -25,15 +24,18 @@ fn print_silver_data(market: json::JsonValue) {
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
     let body = get_page(1).await?;
-
     let parsed = json::parse(&body).unwrap();
+    let number_of_pages = parsed["pages"].as_u32().unwrap();
+    println!("pages {}", number_of_pages);
 
-    for station in parsed["docs"].members() {
-        // println!("id = {}", station["ed_market_id"].to_string());
-        let market = get_market(station["ed_market_id"].to_string()).await?;
-        let market_json = json::parse(&market).unwrap();
-        print_silver_data(market_json);
-        //println!("{}", market_json.pretty(4));
+    for page in 2..number_of_pages {
+        let body = get_page(page).await?;
+        let parsed = json::parse(&body).unwrap();
+        for station in parsed["docs"].members() {
+            let market = get_market(station["ed_market_id"].to_string()).await?;
+            let market_json = json::parse(&market).unwrap();
+            print_silver_data(market_json);
+        }
     }
 
     Ok(())
