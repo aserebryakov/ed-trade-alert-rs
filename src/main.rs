@@ -44,6 +44,8 @@ async fn main() -> Result<(), reqwest::Error> {
     let number_of_pages = parsed["pages"].as_u32().unwrap();
     println!("pages {}", number_of_pages);
 
+    let mut entries = Vec::<CommodityData>::new();
+
     for page in 1..number_of_pages {
         let body = get_page(page).await?;
         let parsed = json::parse(&body).unwrap();
@@ -51,14 +53,21 @@ async fn main() -> Result<(), reqwest::Error> {
             let market = get_market(station["ed_market_id"].to_string()).await?;
             let market_json = json::parse(&market).unwrap();
             if let Some(commodity_data) = get_commodity_data(&market_json, String::from("Silver")) {
-            println!("{:20} Station {:30} {} Price {:10} Supply {:10}",
-                commodity_data.system,
-                commodity_data.station,
-                commodity_data.name,
-                commodity_data.price,
-                commodity_data.supply);
+                println!("Entry processed");
+                entries.push(commodity_data);
             }
         }
+    }
+
+    entries.sort_by(|a, b| b.supply.cmp(&a.supply));
+
+    for commodity in entries {
+        println!("{:20} Station {:30} {} Price {:10} Supply {:10}",
+                commodity.system,
+                commodity.station,
+                commodity.name,
+                commodity.price,
+                commodity.supply);
     }
 
     Ok(())
