@@ -1,5 +1,7 @@
 extern crate reqwest;
 extern crate json;
+use std::io;
+use std::io::Write;
 
 struct CommodityData {
     system: String,
@@ -42,16 +44,19 @@ async fn main() -> Result<(), reqwest::Error> {
     let mut entries = Vec::<CommodityData>::new();
 
     for page in 1..(number_of_pages + 1) {
+        println!("Processing page {} of {}", page, number_of_pages);
         let body = get_page(page).await?;
         let stations = json::parse(&body).unwrap();
         for station in stations["docs"].members() {
             let market = get_market(station["ed_market_id"].to_string()).await?;
             let market_json = json::parse(&market).unwrap();
             if let Some(commodity_data) = get_commodity_data(&market_json, String::from("Silver")) {
-                println!("Entry processed");
+                print!("*");
+                io::stdout().flush().unwrap();
                 entries.push(commodity_data);
             }
         }
+        println!(" Complete");
     }
 
     entries.sort_by(|a, b| b.supply.cmp(&a.supply));
